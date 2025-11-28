@@ -1,0 +1,253 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ===== MÓDULO BASE (COMUM A TODOS) =====
+
+model User {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  password      String
+  name          String
+  role          Role     @default(USER)
+  module        Module   
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  subscription  Subscription?
+  clients       Client[]
+  
+  @@map("users")
+}
+
+model Subscription {
+  id              String            @id @default(uuid())
+  userId          String            @unique
+  user            User              @relation(fields: [userId], references: [id])
+  plan            SubscriptionPlan
+  status          SubscriptionStatus @default(ACTIVE)
+  startDate       DateTime          @default(now())
+  expiresAt       DateTime
+  lastPaymentDate DateTime?
+  amount          Float
+  paymentMethod   String?
+  
+  @@map("subscriptions")
+}
+
+model Client {
+  id        String   @id @default(uuid())
+  name      String
+  email     String?
+  phone     String?
+  cpf       String?  @unique
+  address   String?
+  city      String?
+  state     String?
+  zipCode   String?
+  notes     String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  dentalRecords     DentalRecord[]
+  appointments      Appointment[]
+  vehicles          Vehicle[]
+  sales             Sale[]
+  
+  @@map("clients")
+}
+
+// ===== MÓDULO DENTISTA =====
+
+model DentalRecord {
+  id          String   @id @default(uuid())
+  clientId    String
+  client      Client   @relation(fields: [clientId], references: [id])
+  diagnosis   String
+  treatment   String
+  notes       String?
+  attachments String[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("dental_records")
+}
+
+model Appointment {
+  id          String            @id @default(uuid())
+  clientId    String
+  client      Client            @relation(fields: [clientId], references: [id])
+  date        DateTime
+  duration    Int
+  procedure   String
+  status      AppointmentStatus @default(SCHEDULED)
+  notes       String?
+  price       Float?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  
+  @@map("appointments")
+}
+
+// ===== MÓDULO MECÂNICA =====
+
+model Vehicle {
+  id          String      @id @default(uuid())
+  clientId    String
+  client      Client      @relation(fields: [clientId], references: [id])
+  brand       String
+  model       String
+  year        Int
+  plate       String      @unique
+  color       String?
+  chassisNumber String?   @unique
+  notes       String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  
+  workOrders  WorkOrder[]
+  
+  @@map("vehicles")
+}
+
+model WorkOrder {
+  id          String          @id @default(uuid())
+  vehicleId   String
+  vehicle     Vehicle         @relation(fields: [vehicleId], references: [id])
+  description String
+  services    String[]
+  parts       Json?
+  status      WorkOrderStatus @default(OPEN)
+  startDate   DateTime        @default(now())
+  endDate     DateTime?
+  totalCost   Float?
+  laborCost   Float?
+  partsCost   Float?
+  notes       String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  
+  @@map("work_orders")
+}
+
+// ===== MÓDULO LOJA =====
+
+model Product {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  sku         String   @unique
+  barcode     String?  @unique
+  category    String
+  price       Float
+  costPrice   Float?
+  stock       Int      @default(0)
+  minStock    Int      @default(0)
+  imageUrl    String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  saleItems   SaleItem[]
+  
+  @@map("products")
+}
+
+model Sale {
+  id            String       @id @default(uuid())
+  clientId      String?
+  client        Client?      @relation(fields: [clientId], references: [id])
+  totalAmount   Float
+  discount      Float        @default(0)
+  finalAmount   Float
+  paymentMethod PaymentMethod
+  status        SaleStatus   @default(COMPLETED)
+  notes         String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  
+  items         SaleItem[]
+  
+  @@map("sales")
+}
+
+model SaleItem {
+  id        String   @id @default(uuid())
+  saleId    String
+  sale      Sale     @relation(fields: [saleId], references: [id])
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  quantity  Int
+  unitPrice Float
+  subtotal  Float
+  
+  @@map("sale_items")
+}
+
+// ===== ENUMS =====
+
+enum Role {
+  ADMIN
+  USER
+  MANAGER
+}
+
+enum Module {
+  DENTAL
+  MECHANIC
+  STORE
+}
+
+enum SubscriptionPlan {
+  BASIC
+  PROFESSIONAL
+  ENTERPRISE
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  BLOCKED
+  CANCELLED
+  TRIAL
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum WorkOrderStatus {
+  OPEN
+  IN_PROGRESS
+  WAITING_PARTS
+  WAITING_APPROVAL
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  CREDIT_CARD
+  DEBIT_CARD
+  PIX
+  BANK_TRANSFER
+}
+
+enum SaleStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+  REFUNDED
+}
